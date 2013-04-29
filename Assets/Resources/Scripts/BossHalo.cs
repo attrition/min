@@ -1,11 +1,12 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-public class Mob : MonoBehaviour
+public class BossHalo : MonoBehaviour
 {
     private List<GameObject> halo;
 
     public int HaloElements = 10;
+
     private float haloRadius = 0.4f;
     private float defaultHaloSpeed = 1.3f;
     private float defaultHaloRadius = 0.4f;
@@ -13,13 +14,10 @@ public class Mob : MonoBehaviour
     private float largeHaloRadius = 0.9f;
     private float largeHaloSpeed = 1.3f;
     private bool largeHalo = false;
-    private float moveSpeed = 1.7f;
     private float spreadTime = 15f; // lower is faster
 
     public Mob Player = null;
-    public int Team = 0;
-    public bool LargeHaloOverride = false;
-    public bool LargeHaloOverrideValue = false;
+    public int Team = 1;
 
     // Use this for initialization
     void Start()
@@ -32,10 +30,10 @@ public class Mob : MonoBehaviour
             position.x = (float)(Mathf.Cos(rad) * defaultHaloRadius + this.transform.position.x);
             position.y = (float)(Mathf.Sin(rad) * defaultHaloRadius + this.transform.position.y);
 
-            var ele = Instantiate(Resources.Load("Prefabs/HaloElement"), position, this.transform.rotation) as GameObject;
+            var ele = Instantiate(Resources.Load("Prefabs/HaloElement"), position, Quaternion.identity) as GameObject;
             var he = ele.GetComponent<HaloElement>();
             he.Team = this.Team;
-
+            
             ele.renderer.material = this.renderer.material;
             ele.transform.parent = this.transform;
 
@@ -45,26 +43,13 @@ public class Mob : MonoBehaviour
 
     void FixedUpdate()
     {
-        if (Player == this)
+        largeHalo = false;
+        if (Player != null)
         {
-            if (Input.GetMouseButton(0) || Input.GetKey(KeyCode.Space))
+            var dist = Vector3.Distance(Player.transform.position, this.transform.position);
+            if (dist > 0.8f && dist < 1.5f)
                 largeHalo = true;
-            else
-                largeHalo = false;
         }
-        else // ai
-        {            
-            largeHalo = false;
-            if (Player != null)
-            {
-                var dist = Vector3.Distance(Player.transform.position, this.transform.position);
-                if (dist > 0.8f && dist < 1.5f)
-                    largeHalo = true;
-            }
-        }
-
-        if (LargeHaloOverride)
-            largeHalo = LargeHaloOverrideValue;
 
         if (largeHalo)
             desiredHaloRadius = largeHaloRadius;
@@ -95,6 +80,10 @@ public class Mob : MonoBehaviour
         if (mob != null && mob.Team == this.Team)
             return;
 
+        var boss = collision.gameObject.GetComponent<Boss>();
+        if (boss != null && boss.Team == this.Team)
+            return;
+
         var explosion = Instantiate(Resources.Load("Prefabs/Explosion"), this.transform.position, this.transform.rotation) as GameObject;
         Destroy(explosion, 1f);
 
@@ -109,48 +98,6 @@ public class Mob : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        Vector3 pos = Vector3.zero;
-        if (Player == this)
-        {
-            // position is normalized and multiplied by moveSpeed later
-            if (Input.GetKey(KeyCode.A))
-                pos.x -= 1f;
-            if (Input.GetKey(KeyCode.D))
-                pos.x += 1f;
-            if (Input.GetKey(KeyCode.W))
-                pos.y += 1f;
-            if (Input.GetKey(KeyCode.S))
-                pos.y -= 1f;
-        }
-        else // ai
-        {
-            if (Player != null)
-            {
-                var myPos = this.transform.position;
-                var playerPos = Player.transform.position;
-
-                var dist = Vector3.Distance(myPos, playerPos);
-
-                if (dist > 0.9f)
-                    pos = playerPos - myPos; // move towards
-                else
-                    pos = myPos - playerPos; // move away;
-            }
-        }
-
-        // relative move
-        pos.Normalize();
-        pos *= (Player == this) ? moveSpeed : moveSpeed * 0.75f;
-        pos *= Time.deltaTime;
-        this.transform.position += pos;
-
-        pos = this.transform.position;
-        pos.x = Mathf.Max(pos.x, -6f);
-        pos.y = Mathf.Max(pos.y, -5f);
-        pos.x = Mathf.Min(pos.x, 6f);
-        pos.y = Mathf.Min(pos.y, 5f);
-        this.transform.position = pos;
-
         for (int i = 0; i < HaloElements; ++i)
         {
             if (halo[i] == null)
@@ -162,7 +109,7 @@ public class Mob : MonoBehaviour
             var rad = (i / (float)HaloElements) * 2 * Mathf.PI;
             var speed = largeHalo ? largeHaloSpeed : defaultHaloSpeed;
 
-            var clockwise = (this == Player ? 1f : -1f);
+            var clockwise = 1f;
 
             position.x = (float)(Mathf.Cos(rad - (Time.time * speed) * clockwise) * haloRadius + position.x);
             position.y = (float)(Mathf.Sin(rad - (Time.time * speed) * clockwise) * haloRadius + position.y);
